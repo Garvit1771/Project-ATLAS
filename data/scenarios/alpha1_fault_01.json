@@ -1,0 +1,72 @@
+{
+  "scenario_id": "ALPHA1-FAULT-01",
+  "description": "Thruster 2 progressive degradation during orbital insertion",
+  "mission": "ALPHA-1",
+  "phase": "orbital_insertion",
+  "next_maneuver_utc": "02:30",
+  "abort_window_minutes": 8,
+  "fault": {
+    "onset_tick": 120,
+    "ramp_ticks": 60,
+    "target_tick": 180,
+    "signals": {
+      "thruster_2_vibration_hz":   { "signed_delta": 1.5  },
+      "thruster_2_temp_c":         { "signed_delta": 18.0 },
+      "thruster_2_efficiency_pct": { "signed_delta": -6.0 }
+    },
+    "secondary_signals": {
+      "attitude_error_deg": { "onset_tick": 150, "signed_delta": 0.3  },
+      "cpu_load_pct":       { "onset_tick": 150, "signed_delta": 12.0 },
+      "battery_temp_c":     { "onset_tick": 140, "signed_delta": 3.0  }
+    }
+  },
+  "options": {
+    "CONTINUE": {
+      "label": "Continue current operation",
+      "description": "Maintain current thruster configuration and monitor.",
+      "numeric_state_deltas": {},
+      "boolean_state_changes": {},
+      "risk_score_after_target": 0.73,
+      "fuel_cost_pct": 0.0,
+      "time_delay_min": 0.0,
+      "mission_constraint_satisfied": true,
+      "subsystem_stress": ["propulsion"],
+      "recommendation_strength": "WEAK"
+    },
+    "REDUCE_LOAD": {
+      "label": "Reduce Thruster 2 load by 30%",
+      "description": "Reduce burn output to decrease thermal and mechanical stress on Thruster 2.",
+      "numeric_state_deltas": {
+        "thruster_2_temp_c": -6.0,
+        "thruster_2_vibration_hz": -0.4,
+        "thruster_2_efficiency_pct": 2.0
+      },
+      "boolean_state_changes": {},
+      "risk_score_after_target": 0.45,
+      "fuel_cost_pct": 2.0,
+      "time_delay_min": 2.0,
+      "mission_constraint_satisfied": true,
+      "subsystem_stress": ["propulsion"],
+      "recommendation_strength": "MODERATE"
+    },
+    "SWITCH_REDUNDANT": {
+      "label": "Switch to Redundant Thruster 3",
+      "description": "Deactivate Thruster 2 and transfer burn to Redundant Thruster 3.",
+      "numeric_state_deltas": {
+        "thruster_2_temp_c": -18.0,
+        "thruster_2_vibration_hz": -1.5,
+        "thruster_2_efficiency_pct": 6.0
+      },
+      "boolean_state_changes": {
+        "thruster_2_active": false,
+        "thruster_3_active": true
+      },
+      "risk_score_after_target": 0.18,
+      "fuel_cost_pct": 7.0,
+      "time_delay_min": 4.0,
+      "mission_constraint_satisfied": true,
+      "subsystem_stress": ["propulsion"],
+      "recommendation_strength": "STRONG"
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "z_score_threshold": 2.5,
+  "correlation_window_ticks": 30,
+  "rolling_window_ticks": 60,
+  "risk_weights": {
+    "w_severity": 0.35,
+    "w_trend": 0.25,
+    "w_correlation": 0.20,
+    "w_time": 0.10,
+    "w_redundancy": 0.10
+  },
+  "correlation_rules": {
+    "propulsion": ["thruster_2_vibration_hz", "thruster_2_temp_c", "thruster_2_efficiency_pct"],
+    "power": ["battery_voltage_v", "battery_temp_c"]
+  },
+  "variables": {
+    "battery_voltage_v":         { "min": 26.0,  "max": 29.5,  "subsystem": "power",        "delta_max_per_tick": 0.05  },
+    "battery_temp_c":            { "min": 15.0,  "max": 35.0,  "subsystem": "power",        "delta_max_per_tick": 0.10  },
+    "solar_power_w":             { "min": 80.0,  "max": 120.0, "subsystem": "power",        "delta_max_per_tick": 1.00  },
+    "cpu_temp_c":                { "min": 40.0,  "max": 70.0,  "subsystem": "computing",    "delta_max_per_tick": 0.20  },
+    "cpu_load_pct":              { "min": 20.0,  "max": 70.0,  "subsystem": "computing",    "delta_max_per_tick": 2.00  },
+    "thruster_1_temp_c":         { "min": 180.0, "max": 220.0, "subsystem": "propulsion",   "delta_max_per_tick": 0.60  },
+    "thruster_2_temp_c":         { "min": 180.0, "max": 220.0, "subsystem": "propulsion",   "delta_max_per_tick": 0.60  },
+    "thruster_2_vibration_hz":   { "min": 0.5,   "max": 2.0,   "subsystem": "propulsion",   "delta_max_per_tick": 0.05  },
+    "thruster_2_efficiency_pct": { "min": 92.0,  "max": 98.0,  "subsystem": "propulsion",   "delta_max_per_tick": 0.20  },
+    "attitude_error_deg":        { "min": 0.0,   "max": 0.5,   "subsystem": "attitude",     "delta_max_per_tick": 0.005 },
+    "signal_strength_dbm":       { "min": -85.0, "max": -60.0, "subsystem": "comms",        "delta_max_per_tick": 0.50  },
+    "packet_loss_pct":           { "min": 0.0,   "max": 2.0,   "subsystem": "comms",        "delta_max_per_tick": 0.05  },
+    "radiation_level_mgy":       { "min": 0.1,   "max": 0.8,   "subsystem": "environment",  "delta_max_per_tick": 0.005 }
+  }
+}
