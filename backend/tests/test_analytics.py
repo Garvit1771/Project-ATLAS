@@ -572,3 +572,167 @@ def test_300_tick_run_no_errors():
     # Spot-check: every result has correct tick
     for rec, res in zip(records, results):
         assert res.tick == rec.tick
+
+
+# ── R1 regression: HARD_THRESHOLD method must not be overwritten by Layer 3 ──
+
+def test_engine_hard_threshold_detection_keeps_method_when_layer3_fires():
+    """
+    R1 REGRESSION TEST.
+
+    When a HARD_THRESHOLD detection participates in a Layer 3 composite anomaly,
+    its detection_method must remain HARD_THRESHOLD.
+
+    Before the fix, the Layer 3 update loop unconditionally overwrote ALL
+    correlated variables with ZSCORE_CORRELATION — including variables originally
+    detected via hard threshold.  This produced detection objects with
+    detection_method=ZSCORE_CORRELATION but z_score=None, which is internally
+    contradictory and would corrupt Granite evidence blocks.
+
+    The fix: only ROLLING_ZSCORE detections are upgraded to ZSCORE_CORRELATION.
+    HARD_THRESHOLD detections keep their original method.  The composite fact
+    is recorded at the AnalyticsResult level (composite_anomaly, composite_severity,
+    composite_confidence_*, correlated_signals) — that is sufficient.
+    """
+    from backend.app.analytics.engine import AnalyticsEngine
+    from backend.app.models.analytics import DetectionMethod
+
+    engine = _get_scenario_and_generator()  # returns TelemetryGenerator
+    gen = engine  # alias for clarity
+
+    ae = AnalyticsEngine()
+    records = gen.generate(300)
+    results = ae.process_batch(records)
+
+    # Examine every tick where Layer 3 composite fired
+    composite_ticks = [r for r in results if r.composite_anomaly]
+    assert len(composite_ticks) > 0, "Need at least one composite-anomaly tick to test"
+
+    for result in composite_ticks:
+        for det in result.detections:
+            if det.detection_method == DetectionMethod.HARD_THRESHOLD:
+                # A HARD_THRESHOLD detection must NEVER have z_score set
+                assert det.z_score is None, (
+                    f"tick {result.tick}, var {det.variable}: "
+                    f"HARD_THRESHOLD detection has z_score={det.z_score} — "
+                    "z_score must be None for hard-threshold detections"
+                )
+            if det.detection_method == DetectionMethod.ZSCORE_CORRELATION:
+                # A ZSCORE_CORRELATION detection must ALWAYS have z_score set
+                assert det.z_score is not None, (
+                    f"tick {result.tick}, var {det.variable}: "
+                    f"ZSCORE_CORRELATION detection has z_score=None — "
+                    "this is the R1 regression condition; z_score must not be None "
+                    "for a z-score-correlation detection"
+                )
+
+
+def test_engine_hard_threshold_method_consistent_with_z_score_throughout():
+    """
+    R1 REGRESSION TEST — full 300-tick invariant check.
+
+    For every detection in every tick across the full FAULT-01 run:
+      - If detection_method == HARD_THRESHOLD → z_score must be None.
+      - If detection_method == ROLLING_ZSCORE  → z_score must not be None.
+      - If detection_method == ZSCORE_CORRELATION → z_score must not be None.
+
+    This invariant must hold unconditionally: inside a composite anomaly,
+    outside a composite anomaly, at all severity levels.
+    """
+    from backend.app.analytics.engine import AnalyticsEngine
+    from backend.app.models.analytics import DetectionMethod
+
+    ae = AnalyticsEngine()
+    gen = _get_scenario_and_generator()
+    records = gen.generate(300)
+    results = ae.process_batch(records)
+
+    violations = []
+    for result in results:
+        for det in result.detections:
+            method = det.detection_method
+            z = det.z_score
+            if method == DetectionMethod.HARD_THRESHOLD and z is not None:
+                violations.append(
+                    f"tick {result.tick} {det.variable}: "
+                    f"HARD_THRESHOLD but z_score={z:.4f} (should be None)"
+                )
+            elif method == DetectionMethod.ROLLING_ZSCORE and z is None:
+                violations.append(
+                    f"tick {result.tick} {det.variable}: "
+                    f"ROLLING_ZSCORE but z_score=None (should be a float)"
+                )
+            elif method == DetectionMethod.ZSCORE_CORRELATION and z is None:
+                violations.append(
+                    f"tick {result.tick} {det.variable}: "
+                    f"ZSCORE_CORRELATION but z_score=None — R1 regression condition "
+                    f"(HARD_THRESHOLD was overwritten; fix is not active)"
+                )
+
+    assert not violations, (
+        f"detection_method / z_score consistency violated at {len(violations)} point(s):\n"
+        + "\n".join(violations[:10])
+    )
+
+
+def test_engine_layer3_composite_information_present_when_hard_threshold_participates():
+    """
+    R1 REGRESSION TEST — composite-level fields are populated correctly when
+    HARD_THRESHOLD detections participate in Layer 3.
+
+    The composite information (composite_anomaly, composite_severity,
+    composite_confidence_*, correlated_signals) must still be set correctly
+    at the AnalyticsResult level even though individual HARD_THRESHOLD detections
+    no longer have their method overwritten.
+    """
+    from backend.app.analytics.engine import AnalyticsEngine
+    from backend.app.models.analytics import DetectionMethod, Severity
+
+    ae = AnalyticsEngine()
+    gen = _get_scenario_and_generator()
+    records = gen.generate(300)
+    results = ae.process_batch(records)
+
+    # Find ticks where at least one HARD_THRESHOLD detection is in correlated_signals
+    hard_threshold_composite_ticks = []
+    for result in results:
+        if not result.composite_anomaly:
+            continue
+        hard_threshold_vars_in_composite = [
+            d.variable for d in result.detections
+            if d.detection_method == DetectionMethod.HARD_THRESHOLD
+            and d.variable in result.correlated_signals
+        ]
+        if hard_threshold_vars_in_composite:
+            hard_threshold_composite_ticks.append(
+                (result, hard_threshold_vars_in_composite)
+            )
+
+    # Must find at least some such ticks in the peak-fault window
+    # (thruster_2_vibration_hz and thruster_2_efficiency_pct exceed their envelopes)
+    assert len(hard_threshold_composite_ticks) > 0, (
+        "Expected at least one tick where a HARD_THRESHOLD detection participates "
+        "in a Layer 3 composite (thruster variables should breach envelopes at peak fault)"
+    )
+
+    for result, ht_vars in hard_threshold_composite_ticks:
+        # The composite-level fields must all be populated
+        assert result.composite_anomaly is True
+        assert result.composite_severity is not None, (
+            f"tick {result.tick}: composite_severity is None despite composite_anomaly=True"
+        )
+        assert result.composite_confidence_value is not None, (
+            f"tick {result.tick}: composite_confidence_value is None"
+        )
+        assert result.composite_confidence_band is not None, (
+            f"tick {result.tick}: composite_confidence_band is None"
+        )
+        assert len(result.correlated_signals) >= 2, (
+            f"tick {result.tick}: only {len(result.correlated_signals)} correlated signal(s)"
+        )
+        # The hard-threshold variables are listed in correlated_signals
+        for var in ht_vars:
+            assert var in result.correlated_signals, (
+                f"tick {result.tick}: {var} is a HARD_THRESHOLD detection "
+                f"but not in correlated_signals={result.correlated_signals}"
+            )

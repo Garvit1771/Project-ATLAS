@@ -14,11 +14,11 @@ pandas==2.2.0
 numpy==1.26.4
 
 # IBM Granite / watsonx.ai
-# VERSION FLAG: ibm-watsonx-ai version must be verified against the currently
-# installable release before running `pip install`. The SDK versioning changed
-# significantly between 0.x and 1.x. Run `pip index versions ibm-watsonx-ai`
-# to identify the latest stable release and update this pin before first install.
-ibm-watsonx-ai==0.2.6
+# Verified: 1.6.1 is the latest stable 1.x release (confirmed via pip index versions).
+# Python 3.14.4 compatibility confirmed by successful install and import check.
+# The 0.x API (previously pinned as 0.2.6) used different class names and is
+# incompatible with the Phase 6 implementation.  Do not downgrade.
+ibm-watsonx-ai==1.6.1
 
 # Environment / config
 python-dotenv==1.0.0

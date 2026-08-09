@@ -134,10 +134,21 @@ class AnalyticsEngine:
         if corr_fired and corr_conf is not None:
             composite_conf_band = _confidence_band(corr_conf)
 
-            # Update the detection_method for correlated signals to reflect Layer 3
+            # Update detection_method for correlated signals to reflect Layer 3,
+            # BUT only when the original method was ROLLING_ZSCORE.
+            # HARD_THRESHOLD detections keep their original method because:
+            #   - z_score is None for HARD_THRESHOLD detections (by definition).
+            #   - Overwriting the method with ZSCORE_CORRELATION would produce an
+            #     internally inconsistent detection (method says z-score correlation,
+            #     but z_score is None) that breaks evidence construction for Granite
+            #     and the hard-threshold branch in _apply_action_to_analytics.
+            # The Layer 3 composite information is fully captured at the AnalyticsResult
+            # level (composite_anomaly, composite_severity, composite_confidence_*,
+            # correlated_signals) and does not need to be duplicated on individual
+            # HARD_THRESHOLD detection records.
             updated: dict[str, AnomalyDetection] = {}
             for var, det in per_signal.items():
-                if var in corr_signals:
+                if var in corr_signals and det.detection_method == DetectionMethod.ROLLING_ZSCORE:
                     updated[var] = AnomalyDetection(
                         **{
                             **det.model_dump(),
