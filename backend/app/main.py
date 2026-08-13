@@ -1,12 +1,20 @@
 """
 ATLAS — FastAPI application entry point.
 
-Skeleton only — no routes implemented.
-Routes will be registered in Phase 7 (FastAPI Backend Integration).
+Registers all Phase 7 API routers and configures CORS for local frontend
+development.  The /health endpoint is retained from the Phase 0 skeleton.
+
+Router registration order:
+  telemetry — SSE stream + snapshot
+  analysis  — analytics + risk status
+  decision  — decision options + what-if
+  copilot   — operator Q&A
 """
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from backend.app.api import analysis, copilot, decision, telemetry
 
 app = FastAPI(
     title="ATLAS",
@@ -22,6 +30,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Phase 7 routers
+app.include_router(telemetry.router)
+app.include_router(analysis.router)
+app.include_router(decision.router)
+app.include_router(copilot.router)
 
 
 @app.get("/health")
