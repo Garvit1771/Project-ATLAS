@@ -136,3 +136,34 @@ class CopilotResponse(BaseModel):
             "Falls back to explicit unavailability message if Granite is not configured."
         ),
     )
+
+
+class ExplanationResponse(BaseModel):
+    """
+    Response for GET /api/analysis/explain.
+
+    Contains the IBM Granite anomaly explanation grounded in the current
+    analytics and risk state (source: AI EXPLANATION), plus the subsystem
+    the explanation relates to.  Falls back to the Phase 6 unavailability
+    message if Granite is not configured.
+
+    The deterministic analytics/risk data is NOT duplicated here — the
+    frontend already has it from the SSE stream.  This response carries
+    only the AI layer output.
+    """
+
+    explanation: str = Field(
+        ...,
+        description=(
+            "IBM Granite anomaly explanation grounded in the computed evidence. "
+            "Source tag: AI EXPLANATION. "
+            "Falls back to explicit unavailability message if Granite is not configured."
+        ),
+    )
+    subsystem: str = Field(
+        ...,
+        description=(
+            "Spacecraft subsystem this explanation relates to "
+            "(e.g. 'propulsion'). Derived from composite_subsystem or dominant_variable."
+        ),
+    )

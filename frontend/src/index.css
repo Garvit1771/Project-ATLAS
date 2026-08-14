@@ -1,3 +1,59 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── Base typography ──────────────────────────────────────────────────────── */
+
+@layer base {
+  html,
+  body {
+    @apply h-full;
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #0f172a; /* slate-900 */
+    color: #f1f5f9; /* slate-100 */
+  }
+
+  /* Remove tap highlight on mobile */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Consistent focus style for accessibility */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-violet-500;
+  }
+
+  /* Custom scrollbar — minimal, consistent with dark theme */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-700 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-600;
+  }
+}
+
+/* ── Utility extensions ────────────────────────────────────────────────────── */
+
+@layer utilities {
+  /* Intermediate slate steps not in the default palette */
+  .bg-slate-750 {
+    background-color: #2a3448;
+  }
+  .bg-slate-850 {
+    background-color: #172033;
+  }
+
+  /* Tabular numbers for all monospace values — prevents layout shift */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}

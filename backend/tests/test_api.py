@@ -48,6 +48,7 @@ from backend.app.api.models import (
     AnalysisStatusResponse,
     CopilotRequest,
     CopilotResponse,
+    ExplanationResponse,
     TelemetrySnapshotResponse,
     WhatIfRequest,
     WhatIfResponse,
@@ -944,3 +945,69 @@ class TestEndToEndPipeline:
             "thruster_2_efficiency_pct",
         }
         assert len(set(analytics.correlated_signals) & propulsion_vars) >= 2
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# H — Analysis explain endpoint (Phase 8 addition)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestAnalysisExplainEndpoint:
+    """
+    Tests for GET /api/analysis/explain.
+
+    This endpoint calls GraniteClient.explain_anomaly() using the same
+    evidence-grounded prompt architecture as the Phase 6 copilot and
+    what-if endpoints.  It is intentionally separate from /api/analysis/status
+    so that Granite latency never blocks the SSE telemetry tick loop.
+    """
+
+    def test_explain_503_before_ticks(self, client, reset_state):
+        """Endpoint must return 503 if the SSE stream has not produced a tick."""
+        r = client.get("/api/analysis/explain")
+        assert r.status_code == 503
+
+    def test_explain_200_with_state_and_fallback(self, client, seeded_state, no_cred_granite):
+        """Endpoint returns 200 even when Granite is unavailable (fallback)."""
+        r = client.get("/api/analysis/explain")
+        assert r.status_code == 200
+
+    def test_explain_response_has_explanation_field(self, client, seeded_state, no_cred_granite):
+        """Response must have an 'explanation' string field."""
+        body = client.get("/api/analysis/explain").json()
+        assert "explanation" in body
+        assert isinstance(body["explanation"], str)
+        assert len(body["explanation"]) > 0
+
+    def test_explain_response_has_subsystem_field(self, client, seeded_state, no_cred_granite):
+        """Response must include the 'subsystem' field derived from analytics state."""
+        body = client.get("/api/analysis/explain").json()
+        assert "subsystem" in body
+        assert isinstance(body["subsystem"], str)
+        assert len(body["subsystem"]) > 0
+
+    def test_explain_fallback_is_unavailability_message(self, client, seeded_state, no_cred_granite):
+        """When Granite is unavailable the explanation must be the fallback sentinel."""
+        from backend.app.ai.client import _UNAVAILABLE
+        body = client.get("/api/analysis/explain").json()
+        assert body["explanation"] == _UNAVAILABLE
+
+    def test_explain_mocked_granite_passes_through_text(self, client, seeded_state, mock_granite):
+        """Mocked Granite response is passed through as the explanation."""
+        body = client.get("/api/analysis/explain").json()
+        assert body["explanation"] == "Mocked Granite response."
+
+    def test_explain_subsystem_is_valid_string(self, client, seeded_state, no_cred_granite):
+        """subsystem must be a non-empty string (e.g. 'propulsion')."""
+        body = client.get("/api/analysis/explain").json()
+        subsystem = body["subsystem"]
+        assert isinstance(subsystem, str)
+        assert len(subsystem) > 0
+        # After 200 ticks with FAULT-01, composite_subsystem should be 'propulsion'
+        assert subsystem == "propulsion"
+
+    def test_explain_model_validates(self, client, seeded_state, no_cred_granite):
+        """Response body must deserialise into ExplanationResponse without error."""
+        body = client.get("/api/analysis/explain").json()
+        resp = ExplanationResponse(**body)
+        assert resp.explanation
+        assert resp.subsystem
