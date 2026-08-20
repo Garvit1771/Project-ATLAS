@@ -46,3 +46,5 @@ logs/
 
 # OS
 .DS_Store
+
+.vite/
